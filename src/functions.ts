@@ -1,6 +1,6 @@
 import * as amx from "@sa-mp/amx";
-import {BulletHitTypes, FightStyles, Group, Player, Position, Position2D, SpecialActions, Weapons, WeaponSkills, WeaponStates} from "@sa-mp/core";
-import {Fcnpc, FcnpcEntityCheck, FcnpcEntityModes, FcnpcMoveModes, FcnpcMovePathfinding, FcnpcMoveSpeed, FcnpcMoveTypes} from ".";
+import {BulletHitTypes, FightStyles, Group, Player, PlayerObject, Position, Position2D, SampObject, SpecialActions, Vehicle, Weapons, WeaponSkills, WeaponStates} from "@sa-mp/core";
+import {Fcnpc, FcnpcEntityCheck, FcnpcEntityModes, FcnpcMoveModes, FcnpcMovePath, FcnpcMovePathfinding, FcnpcMoveSpeed, FcnpcMoveTypes, FcnpcNode} from ".";
 
 export interface FcnpcSpawnOptions extends Position {
     skin: number;
@@ -112,6 +112,49 @@ export interface FcnpcTriggerWeaponShotOptions extends Position {
     betweenCheckFlags?: FcnpcEntityCheck;
 }
 
+export interface FcnpcGetClosestEntityInBetweenOptions extends Position {
+    range: number;
+    betweenCheckMode?: FcnpcEntityModes; 
+    betweenCheckFlags?: FcnpcEntityCheck;
+    offsetFrom?: Position;
+}
+
+export interface FcnpcGetClosestEntityInBetweenResponse {
+    id: number;
+    type: number;
+    objectOwner: Player;
+    point: Position;
+}
+
+export interface FcnpcStartPlayingPlaybackOptions {
+    file?: string;
+    record?: number;
+    autoUnload?: boolean;
+    delta?: Position;
+    deltaQ?: {w: number} & Position;
+}
+
+export interface FcnpcPlayNodeOptions {
+    node: FcnpcNode;
+    type?: FcnpcMoveTypes;
+    speed?: number;
+    mode?: FcnpcMoveModes;
+    radius?: number;
+    setAngle?: boolean;
+}
+
+export interface FcnpcGoOptions {
+    path: FcnpcMovePath;
+    point?: number;
+    type?: FcnpcMoveTypes;
+    speed?: number;
+    mode?: FcnpcMoveModes;
+    pathfinding?: FcnpcMovePathfinding;
+    radius?: number;
+    setAngle?: boolean;
+    minDistance?: number;
+}
+
 export class FcnpcFunctions {
     public static getPluginVersion(size: number): string {
         const [version] = amx.callNative("FCNPC_GetPluginVersion", "Si", size, size);
@@ -186,6 +229,14 @@ export class FcnpcFunctions {
     public static getWeaponDefaultInfo(weapon: Weapons): FcnpcWeaponInfo {
         const [reloadTime, shootTime, clipSize, accuracy] = amx.callNative("FCNPC_GetWeaponDefaultInfo", "iIIIF", weapon) as number[];
         return {reloadTime, shootTime, clipSize, accuracy};
+    }
+
+    public static loadPlayingPlayback(file: string): void {
+        amx.callNative("FCNPC_LoadPlayingPlayback", "s", file);
+    }
+
+    public static unloadPlayingPlayback(record: number): void {
+        amx.callNative("FCNPC_UnloadPlayingPlayback", "i", record);
     }
 
     public id: number = -1;
@@ -596,5 +647,186 @@ export class FcnpcFunctions {
 
     public triggerWeaponShot({weapon, hitType, hitId, x, y, z, isHit = true, offsetFrom = {x: 0.0, y: 0.0, z: 0.0}, betweenCheckMode = FcnpcEntityModes.AUTO, betweenCheckFlags = FcnpcEntityCheck.ALL}: FcnpcTriggerWeaponShotOptions): void {
         amx.callNative("FCNPC_TriggerWeaponShot", "iiiifffifffii", this.id, weapon, hitType, hitId, x, y, z, Number(isHit), offsetFrom.x, offsetFrom.y, offsetFrom.z, betweenCheckMode, betweenCheckFlags);
+    }
+
+    public getClosestEntityInBetween({x, y, z, range, betweenCheckMode = FcnpcEntityModes.AUTO, betweenCheckFlags = FcnpcEntityCheck.ALL, offsetFrom = {x: 0.0, y: 0.0, z: 0.0}}: FcnpcGetClosestEntityInBetweenOptions): FcnpcGetClosestEntityInBetweenResponse {
+        const [id, type, objectOwnerId, pointX, pointY, pointZ] = amx.callNative("FCNPC_GetClosestEntityInBetween", "iffffiifffIIIFFF", this.id, x, y, z, range, betweenCheckMode, betweenCheckFlags, offsetFrom.x, offsetFrom.y, offsetFrom.z) as number[];
+        return {id, type, objectOwner: Player.getById(objectOwnerId), point: {x: pointX, y: pointY, z: pointZ}};
+    }
+
+    public enterVehicle(vehicle: Vehicle, seat: number = 0, type: FcnpcMoveTypes = FcnpcMoveTypes.WALK): void {
+        amx.callNative("FCNPC_EnterVehicle", "iiii", this.id, vehicle.id, seat, type);
+    }
+
+    public exitVehicle(): void {
+        amx.callNative("FCNPC_ExitVehicle", "i", this.id);
+    }
+
+    public put(vehicle: Vehicle, seat: number = 0): void {
+        amx.callNative("FCNPC_PutInVehicle", "iii", this.id, vehicle.id, seat);
+    }
+
+    public removeFromVehicle(): void {
+        amx.callNative("FCNPC_RemoveFromVehicle", "i", this.id);
+    }
+
+    public get vehicle(): Vehicle {
+        return Vehicle.getById(amx.callNative("FCNPC_GetVehicleID", "i", this.id).retval);
+    }
+
+    public get vehicleSeat(): number {
+        return amx.callNative("FCNPC_GetVehicleSeat", "i", this.id).retval;
+    }
+
+    public useVehicleSiren(use: boolean = true): void {
+        amx.callNative("FCNPC_UseVehicleSiren", "ii", this.id, Number(use));
+    }
+
+    public isVehicleSirenUsed(): boolean {
+        return Boolean(amx.callNative("FCNPC_IsVehicleSirenUsed", "i", this.id).retval);
+    }
+
+    public set vehicleHealth(health: number) {
+        amx.callNative("FCNPC_SetVehicleHealth", "if", this.id, health);
+    }
+
+    public get vehicleHealth(): number {
+        return amx.callNativeInFloat("FCNPC_GetVehicleHealth", "i", this.id).retval;
+    }
+
+    public set vehicleHydraThrusters(direction: number) {
+        amx.callNative("FCNPC_SetVehicleHydraThrusters", "ii", this.id, direction);
+    }
+
+    public get vehicleHydraThrusters(): number {
+        return amx.callNative("FCNPC_GetVehicleHydraThrusters", "i", this.id).retval;
+    }
+
+    public set vehicleGearState(state: number) {
+        amx.callNative("FCNPC_SetVehicleGearState", "ii", this.id, state);
+    }
+
+    public get vehicleGearState(): number {
+        return amx.callNative("FCNPC_GetVehicleGearState", "i", this.id).retval;
+    }
+
+    public set vehicleTrainSpeed(speed: number) {
+        amx.callNative("FCNPC_SetVehicleTrainSpeed", "if", this.id, speed);
+    }
+
+    public get vehicleTrainSpeed(): number {
+        return amx.callNativeInFloat("FCNPC_GetVehicleTrainSpeed", "i", this.id).retval;
+    }
+
+    public surfing(element: Position | Vehicle | SampObject | PlayerObject): void {
+        if(element instanceof Vehicle)
+            amx.callNative("FCNPC_SetSurfingVehicle", "ii", this.id, element.id);
+        else if(element instanceof SampObject)
+            amx.callNative("FCNPC_SetSurfingObject", "ii", this.id, element.id);
+        else if(element instanceof PlayerObject)
+            amx.callNative("FCNPC_SetSurfingPlayerObject", "ii", this.id, element.id);
+        else amx.callNative("FCNPC_SetSurfingOffsets", "ifff", this.id, element.x, element.y, element.z);
+    }
+
+    public giveSurfingOffsets({x, y, z}: Position): void {
+        amx.callNative("FCNPC_GiveSurfingOffsets", "ifff", this.id, x, y, z);
+    }
+
+    public get surfingOffsets(): Position {
+        const [x, y, z] = amx.callNative("FCNPC_GetSurfingOffsets", "iFFF", this.id) as number[];
+        return {x, y, z};
+    }
+
+    public get surfingVehicle(): Vehicle {
+        return Vehicle.getById(amx.callNative("FCNPC_GetSurfingVehicle", "i", this.id).retval);
+    }
+
+    public get surfingObject(): SampObject {
+        return SampObject.getById(amx.callNative("FCNPC_GetSurfingObject", "i", this.id).retval);
+    }
+
+    public getSurfingPlayerObject(player: Player): PlayerObject {
+        return PlayerObject.getById(amx.callNative("FCNPC_GetSurfingPlayerObject", "i", this.id).retval, player);
+    }
+
+    public stopSurfing(): void {
+        amx.callNative("FCNPC_StopSurfing", "i", this.id);
+    }
+
+    public startPlayingPlayback({file = "", record = Fcnpc.constants.INVALID_RECORD_ID, autoUnload = false, delta = {x: 0.0, y: 0.0, z: 0.0}, deltaQ = {w: 0.0, x: 0.0, y: 0.0, z: 0.0}}: FcnpcStartPlayingPlaybackOptions): void {
+        amx.callNative("FCNPC_StartPlayingPlayback", "isiifffffff", this.id, file, record, Number(autoUnload), delta.x, delta.y, delta.z, deltaQ.w, deltaQ.x, deltaQ.y, deltaQ.z);
+    }
+
+    public stopPlayingPlayback(): void {
+        amx.callNative("FCNPC_StopPlayingPlayback", "i", this.id);
+    }
+
+    public pausePlayingPlayback(): void {
+        amx.callNative("FCNPC_PausePlayingPlayback", "i", this.id);
+    }
+
+    public resumePlayingPlayback(): void {
+        amx.callNative("FCNPC_ResumePlayingPlayback", "i", this.id);
+    }
+
+    public setPlayingPlaybackPath(path: string): void {
+        amx.callNative("FCNPC_SetPlayingPlaybackPath", "is", this.id, path);
+    }
+
+    public getPlayingPlaybackPath(size: number): string {
+        const [path] = amx.callNative("FCNPC_GetPlayingPlaybackPath", "iSi", this.id, size, size) as string[];
+        return path;
+    }
+
+    public playNode({node, type = FcnpcMoveTypes.AUTO, speed = FcnpcMoveSpeed.AUTO, mode = FcnpcMoveModes.AUTO, radius = 0.0, setAngle = true}: FcnpcPlayNodeOptions): void {
+        amx.callNative("FCNPC_PlayNode", "iiififi", this.id, node.id, type, speed, mode, radius, Number(setAngle));
+    }
+
+    public stopPlayingNode(): void {
+        amx.callNative("FCNPC_StopPlayingNode", "i", this.id);
+    }
+
+    public pausePlayingNode(): void {
+        amx.callNative("FCNPC_PausePlayingNode", "i", this.id);
+    }
+
+    public resumePlayingNode(): void {
+        amx.callNative("FCNPC_ResumePlayingNode", "i", this.id);
+    }
+
+    public isPlayingNode(): boolean {
+        return Boolean(amx.callNative("FCNPC_IsPlayingNode", "i", this.id).retval);
+    }
+
+    public isPlayingNodePaused(): boolean {
+        return Boolean(amx.callNative("FCNPC_IsPlayingNodePaused", "i", this.id).retval);
+    }
+
+    public go({path, point = 0, type = FcnpcMoveTypes.AUTO, speed = FcnpcMoveSpeed.AUTO, mode = FcnpcMoveModes.AUTO, pathfinding = FcnpcMovePathfinding.AUTO, radius = 0.0, setAngle = true, minDistance = 0.0}: FcnpcGoOptions): void {
+        amx.callNative("FCNPC_GoByMovePath", "iiiifiifif", this.id, path.id, point, type, speed, mode, pathfinding, radius, Number(setAngle), minDistance);
+    }
+
+    public set moveMode(mode: FcnpcMoveModes) {
+        amx.callNative("FCNPC_SetMoveMode", "ii", this.id, mode);
+    }
+
+    public get moveMode(): FcnpcMoveModes {
+        return amx.callNative("FCNPC_GetMoveMode", "i", this.id).retval;
+    }
+
+    public setMinHeightPosCall(height: number): void {
+        amx.callNative("FCNPC_SetMinHeightPosCall", "if", this.id, height);
+    }
+
+    public getMinHeightPosCall(): number {
+        return amx.callNativeInFloat("FCNPC_GetMinHeightPosCall", "i", this.id).retval;
+    }
+
+    public showInTabListForPlayer(forPlayer: Player): void {
+        amx.callNative("FCNPC_ShowInTabListForPlayer", "ii", this.id, forPlayer.id);
+    }
+
+    public hideInTabListForPlayer(forPlayer: Player): void {
+        amx.callNative("FCNPC_HideInTabListForPlayer", "ii", this.id, forPlayer.id);
     }
 }
