@@ -829,4 +829,12 @@ export class FcnpcFunctions {
     public hideInTabListForPlayer(forPlayer: Player): void {
         amx.callNative("FCNPC_HideInTabListForPlayer", "ii", this.id, forPlayer.id);
     }
+
+    public get player(): Player {
+        return Player.getById(this.id);
+    }
+
+    public toString(): string {
+        return `${this.player.name}[${this.id}]`;
+    }
 }
